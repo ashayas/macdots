@@ -27,6 +27,7 @@ I built **MacDots** to bring that same life-changing capability to the Mac. By t
 
 - **Direct Apple Silicon MEMS IMU:** Interfaces directly with the MacBook's internal `AppleSPUHIDDevice` (Bosch BMI286 or equivalent IMU) via unprivileged IOKit HID at **100 Hz** with sub-millisecond latency.
 - **100% Click-Through Overlay:** Non-activating, transparent overlay panels (`.ignoresMouseEvents = true`, `.canJoinAllSpaces`) float smoothly above all full-screen workspaces, Xcode, browsers, and terminals without ever intercepting clicks or keystrokes.
+- **Screen Recording & Screen Share Privacy:** All overlay windows configure macOS WindowServer compositor exclusion (`window.sharingType = .none`). Motion dots are completely invisible to others during Zoom, Google Meet, Teams, and Slack screen sharing, and are omitted from QuickTime, CleanShot X, and OBS screen recordings.
 - **Sleek Vector Menu Bar Icon:** High-DPI Retina template icon depicting screen-edge motion cues and a horizon stabilizer that natively adapts to dark and light macOS menu bars.
 - **Anticipatory Jerk Feed-Forward:** Evaluates the rate of change of acceleration (`da/dt`) to shift dots 120ms ahead of peak lateral forces, mimicking the neurological anticipatory model that prevents vehicle drivers from feeling sick.
 - **Artificial Horizon Roll Tilt:** Tilts peripheral cues dynamically with the vehicle's banking angle (`arctan(ax / g)`), anchoring the vestibular-ocular reflex to the true inertial horizon.

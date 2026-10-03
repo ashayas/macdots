@@ -80,6 +80,23 @@ public struct SettingsWindowView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+
+            Section("Privacy & Screen Sharing") {
+                Toggle("Hide dots during screen recording and screen sharing", isOn: $appState.hideWhenScreenCaptured)
+                Text("All overlay windows automatically use WindowServer compositor exclusion (window.sharingType = .none) so dots are NEVER visible to others on Zoom, Google Meet, Teams, QuickTime recordings, or screenshots. Enabling this also automatically hides the dots from your own screen when presenting.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                if appState.isScreenCaptured {
+                    HStack(spacing: 6) {
+                        Image(systemName: "video.fill")
+                            .foregroundColor(.orange)
+                        Text("Active screen capture session detected.")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
     }

@@ -2,6 +2,7 @@ import Cocoa
 import SwiftUI
 
 /// Window controller creating click-through, non-activating, full-screen transparent overlays
+/// Configured with window.sharingType = .none to prevent capture in screen recordings or screen sharing
 @MainActor
 public final class OverlayWindowManager {
     private var windows: [NSWindow] = []
@@ -26,7 +27,6 @@ public final class OverlayWindowManager {
     }
 
     public func recreateWindows() {
-        // Close existing windows
         for win in windows {
             win.orderOut(nil)
         }
@@ -35,12 +35,22 @@ public final class OverlayWindowManager {
         for screen in NSScreen.screens {
             let win = createOverlayWindow(for: screen)
             windows.append(win)
-            win.orderFrontRegardless()
+            if shouldBeVisible {
+                win.orderFrontRegardless()
+            }
         }
 
         if let primary = NSScreen.main {
             appState.reconfigurePhysics(for: primary.frame.size)
         }
+    }
+
+    private var shouldBeVisible: Bool {
+        guard appState.isEnabled else { return false }
+        if appState.hideWhenScreenCaptured && appState.isScreenCaptured {
+            return false
+        }
+        return true
     }
 
     private func createOverlayWindow(for screen: NSScreen) -> NSWindow {
@@ -52,11 +62,15 @@ public final class OverlayWindowManager {
             defer: false
         )
 
+        // Essential privacy setting: window contents are excluded from all screen recordings,
+        // screenshots, ScreenCaptureKit streams, and screen sharing sessions (Zoom, Meet, Teams)
+        window.sharingType = .none
+
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
         window.ignoresMouseEvents = true
-        window.level = .floating // Stays above regular windows and desktop spaces
+        window.level = .floating
         window.collectionBehavior = [
             .canJoinAllSpaces,
             .fullScreenAuxiliary,
@@ -75,7 +89,7 @@ public final class OverlayWindowManager {
 
     public func updateVisibility() {
         for win in windows {
-            if appState.isEnabled {
+            if shouldBeVisible {
                 win.orderFrontRegardless()
             } else {
                 win.orderOut(nil)

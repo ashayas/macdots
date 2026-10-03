@@ -15,6 +15,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationDidFinishLaunching(_ notification: Notification) {
         // Create full-screen transparent click-through overlays
         overlayManager = OverlayWindowManager(appState: appState)
+        appState.onVisibilityNeedsUpdate = { [weak self] in
+            self?.overlayManager?.updateVisibility()
+        }
 
         // Setup sleek Menu Bar Status Item
         setupStatusItem()

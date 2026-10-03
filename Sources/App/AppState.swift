@@ -153,6 +153,23 @@ public final class AppState: ObservableObject {
         didSet { savePreferences() }
     }
 
+    // Privacy & Screen Sharing Protection
+    @Published public var hideWhenScreenCaptured: Bool = true {
+        didSet {
+            savePreferences()
+            onVisibilityNeedsUpdate?()
+        }
+    }
+
+    @Published public var isScreenCaptured: Bool = false {
+        didSet {
+            onVisibilityNeedsUpdate?()
+        }
+    }
+
+    public var onVisibilityNeedsUpdate: (@MainActor () -> Void)?
+    public let screenCaptureDetector = ScreenCaptureDetector()
+
     // Physics & Sensation Tuning
     @Published public var sensitivity: Double = 1.0 {
         didSet {
@@ -230,6 +247,13 @@ public final class AppState: ObservableObject {
             sensorSource = .simulator
         }
 
+        // Real-time screen capture / presentation detection
+        screenCaptureDetector.start { [weak self] isCapturing in
+            Task { @MainActor in
+                self?.isScreenCaptured = isCapturing
+            }
+        }
+
         startMotionPipeline()
     }
 
@@ -301,6 +325,7 @@ public final class AppState: ObservableObject {
         defaults.set(dynamicVignetteEnabled, forKey: "md_dynamicVignetteEnabled")
         defaults.set(vagalCalmingEnabled, forKey: "md_vagalCalmingEnabled")
         defaults.set(showHorizonGuide, forKey: "md_showHorizonGuide")
+        defaults.set(hideWhenScreenCaptured, forKey: "md_hideWhenScreenCaptured")
         defaults.set(sensitivity, forKey: "md_sensitivity")
         defaults.set(stiffness, forKey: "md_stiffness")
         defaults.set(damping, forKey: "md_damping")
@@ -359,6 +384,9 @@ public final class AppState: ObservableObject {
         }
         if defaults.object(forKey: "md_showHorizonGuide") != nil {
             showHorizonGuide = defaults.bool(forKey: "md_showHorizonGuide")
+        }
+        if defaults.object(forKey: "md_hideWhenScreenCaptured") != nil {
+            hideWhenScreenCaptured = defaults.bool(forKey: "md_hideWhenScreenCaptured")
         }
         if defaults.object(forKey: "md_sensitivity") != nil {
             sensitivity = defaults.double(forKey: "md_sensitivity")
