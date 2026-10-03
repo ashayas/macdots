@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>MacDots Web - Vehicle Motion Cues</title>
+  <style>
+    :root {
+      --bg: #0c0f17;
+      --card-bg: rgba(22, 28, 42, 0.75);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --accent: #00d2ff;
+      --accent-glow: rgba(0, 210, 255, 0.4);
+      --text: #f0f4f8;
+      --text-muted: #8a99ad;
+      --dot-color: #ffffff;
+      --dot-glow: rgba(255, 255, 255, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Motion Canvas overlay */
+    #motionCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* Clean browser mockup content area */
+    .viewport {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 10;
+      max-width: 820px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: rgba(0, 210, 255, 0.12);
+      border: 1px solid rgba(0, 210, 255, 0.25);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+    }
+
+    p.subtitle {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      max-width: 580px;
+      margin-bottom: 28px;
+    }
+
+    /* Control Panel */
+    .panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      width: 100%;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      text-align: left;
+    }
+
+    .control-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    select, button {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    select:hover, button:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #05101a;
+      border: none;
+      font-weight: 600;
+    }
+
+    button.primary:hover {
+      background: #38e1ff;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+    }
+
+    /* Live Telemetry Bar */
+    .telemetry-bar {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    .telemetry-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .telemetry-val {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .state-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Kinetic Motion Canvas -->
+  <canvas id="motionCanvas"></canvas>
+
+  <div class="viewport">
+    <div class="header-badge">
+      <span class="state-indicator" id="statusDot"></span>
+      <span id="statusText">Active: City Bus Simulation</span>
+    </div>
+
+    <h1>MacDots Web Edition</h1>
+    <p class="subtitle">
+      Peripheral motion cues aligned with physical vehicle kinematics to eliminate motion sickness while working on screens.
+    </p>
+
+    <div class="panel">
+      <div class="controls-grid">
+        <div class="control-item">
+          <label>Motion Source</label>
+          <select id="sourceSelect">
+            <option value="sim_bus">City Bus (Stop-and-Go)</option>
+            <option value="sim_plane">Airplane (Cruise & Turbulence)</option>
+            <option value="sim_subway">Subway / Train (Track Sway)</option>
+            <option value="sim_car">Highway Car (Lane Changes)</option>
+            <option value="sim_mountain">Winding Mountain Road</option>
+            <option value="device">Device Sensors (Mobile/iPad)</option>
+          </select>
+        </div>
+
+        <div class="control-item">
+          <label>Visual Theme</label>
+          <select id="themeSelect">
+            <option value="apple">Apple Slate (White)</option>
+            <option value="cyan">Electric Cyan</option>
+            <option value="amber">Amber Night</option>
+            <option value="emerald">Neon Emerald</option>
+          </select>
+        </div>
+
+        <div class="control-item">
+          <label>Sensitivity (<span id="sensVal">1.0x</span>)</label>
+          <div class="slider-row">
+            <input type="range" id="sensSlider" min="0.4" max="2.5" step="0.1" value="1.0">
+          </div>
+        </div>
+
+        <div class="control-item">
+          <label>Quick Test Impulse</label>
+          <div style="display: flex; gap: 6px;">
+            <button id="turnLeftBtn" style="flex: 1;">Turn Left</button>
+            <button id="turnRightBtn" style="flex: 1;">Turn Right</button>
+            <button id="brakeBtn" style="flex: 1;">Brake</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="telemetry-bar">
+        <div class="telemetry-item">
+          <span>Lateral G (X):</span>
+          <span class="telemetry-val" id="telemetryX">0.00g</span>
+        </div>
+        <div class="telemetry-item">
+          <span>Longitudinal G (Y):</span>
+          <span class="telemetry-val" id="telemetryY">0.00g</span>
+        </div>
+        <div class="telemetry-item">
+          <span>Horizon Tilt:</span>
+          <span class="telemetry-val" id="telemetryRoll">0.0°</span>
+        </div>
+        <div class="telemetry-item">
+          <span>State:</span>
+          <span class="telemetry-val" id="telemetryState">Cruising</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Physics & Particle Engine
+    const canvas = document.getElementById('motionCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width * window.devicePixelRatio;
+      canvas.height = height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      initParticles();
+    }
+    window.addEventListener('resize', resize);
+
+    // Particle model
+    let particles = [];
+    const MARGIN = 36;
+    const DOT_COUNT_SIDE = 7;
+    const DOT_COUNT_TOP = 8;
+
+    function initParticles() {
+      particles = [];
+      // Left edge
+      for (let i = 0; i < DOT_COUNT_SIDE; i++) {
+        const y = MARGIN + ((i + 1) / (DOT_COUNT_SIDE + 1)) * (height - 2 * MARGIN);
+        particles.push({ edge: 'left', anchorX: MARGIN, anchorY: y, x: MARGIN, y: y, vx: 0, vy: 0 });
+      }
+      // Right edge
+      for (let i = 0; i < DOT_COUNT_SIDE; i++) {
+        const y = MARGIN + ((i + 1) / (DOT_COUNT_SIDE + 1)) * (height - 2 * MARGIN);
+        particles.push({ edge: 'right', anchorX: width - MARGIN, anchorY: y, x: width - MARGIN, y: y, vx: 0, vy: 0 });
+      }
+      // Top edge
+      for (let i = 0; i < DOT_COUNT_TOP; i++) {
+        const x = MARGIN + ((i + 1) / (DOT_COUNT_TOP + 1)) * (width - 2 * MARGIN);
+        particles.push({ edge: 'top', anchorX: x, anchorY: MARGIN, x: x, y: MARGIN, vx: 0, vy: 0 });
+      }
+      // Bottom edge
+      for (let i = 0; i < DOT_COUNT_TOP; i++) {
+        const x = MARGIN + ((i + 1) / (DOT_COUNT_TOP + 1)) * (width - 2 * MARGIN);
+        particles.push({ edge: 'bottom', anchorX: x, anchorY: height - MARGIN, x: x, y: height - MARGIN, vx: 0, vy: 0 });
+      }
+    }
+
+    // Kinematic forces
+    let accelX = 0;
+    let accelY = 0;
+    let rollAngle = 0;
+    let sensitivity = 1.0;
+    let manualOffset = { x: 0, y: 0 };
+
+    // Vehicle simulator functions
+    function computeVehicleForces(mode, t) {
+      if (mode === 'sim_bus') {
+        const cycle = t % 28;
+        if (cycle < 4) return { x: 0, y: 0, state: 'Stationary at Stop' };
+        if (cycle < 9) {
+          const p = (cycle - 4) / 5;
+          return { x: 0.02 * Math.sin(t * 3), y: -0.22 * Math.sin(p * Math.PI), state: 'Accelerating' };
+        }
+        if (cycle < 14) return { x: 0.02 * Math.sin(t * 2), y: 0.01 * Math.sin(t), state: 'Cruising' };
+        if (cycle < 18) {
+          const p = (cycle - 14) / 4;
+          return { x: -0.28 * Math.sin(p * Math.PI), y: -0.05, state: 'Turning Right' };
+        }
+        if (cycle < 22) {
+          const p = (cycle - 18) / 4;
+          return { x: 0.26 * Math.sin(p * Math.PI), y: 0.0, state: 'Turning Left' };
+        }
+        const p = (cycle - 22) / 6;
+        return { x: 0, y: 0.32 * Math.sin(p * Math.PI), state: 'Braking for Stop' };
+      } else if (mode === 'sim_plane') {
+        const chop = Math.sin(t * 1.5) * 0.08 + Math.sin(t * 4.2) * 0.05;
+        const bank = Math.sin(t * 0.2) * 0.15;
+        return { x: bank + Math.sin(t * 3) * 0.03, y: Math.sin(t * 0.8) * 0.02, state: 'Cruising & Chop' };
+      } else if (mode === 'sim_subway') {
+        const sway = Math.sin(t * 1.6) * 0.07;
+        return { x: sway, y: Math.sin(t * 0.4) * 0.04, state: 'Rail Sway' };
+      } else if (mode === 'sim_car') {
+        const laneChange = Math.sin((t % 15) / 15 * Math.PI * 2) * 0.18;
+        return { x: laneChange, y: 0.02, state: 'Highway Driving' };
+      } else {
+        // Mountain road
+        const curve = Math.sin(t * 0.7) * 0.28;
+        return { x: curve, y: -Math.cos(t * 0.7) * 0.12, state: 'Mountain Curves' };
+      }
+    }
+
+    // Themes
+    const themes = {
+      apple: { primary: '#ffffff', glow: 'rgba(255, 255, 255, 0.4)' },
+      cyan: { primary: '#00d2ff', glow: 'rgba(0, 210, 255, 0.6)' },
+      amber: { primary: '#ffaa22', glow: 'rgba(255, 170, 34, 0.6)' },
+      emerald: { primary: '#10b981', glow: 'rgba(16, 185, 129, 0.6)' },
+    };
+    let currentTheme = themes.apple;
+
+    // UI event listeners
+    const sourceSelect = document.getElementById('sourceSelect');
+    const themeSelect = document.getElementById('themeSelect');
+    const sensSlider = document.getElementById('sensSlider');
+    const sensVal = document.getElementById('sensVal');
+    const statusText = document.getElementById('statusText');
+    const telemetryX = document.getElementById('telemetryX');
+    const telemetryY = document.getElementById('telemetryY');
+    const telemetryRoll = document.getElementById('telemetryRoll');
+    const telemetryState = document.getElementById('telemetryState');
+
+    themeSelect.addEventListener('change', (e) => {
+      currentTheme = themes[e.target.value] || themes.apple;
+    });
+
+    sensSlider.addEventListener('input', (e) => {
+      sensitivity = parseFloat(e.target.value);
+      sensVal.textContent = sensitivity.toFixed(1) + 'x';
+    });
+
+    function injectImpulse(x, y, ms = 800) {
+      manualOffset.x = x;
+      manualOffset.y = y;
+      setTimeout(() => { manualOffset.x = 0; manualOffset.y = 0; }, ms);
+    }
+    document.getElementById('turnLeftBtn').onclick = () => injectImpulse(0.3, 0);
+    document.getElementById('turnRightBtn').onclick = () => injectImpulse(-0.3, 0);
+    document.getElementById('brakeBtn').onclick = () => injectImpulse(0, 0.35);
+
+    // Device motion sensor permission for iOS
+    sourceSelect.addEventListener('change', async (e) => {
+      if (e.target.value === 'device') {
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+          try {
+            const resp = await DeviceMotionEvent.requestPermission();
+            if (resp === 'granted') {
+              window.addEventListener('devicemotion', handleDeviceMotion);
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        } else {
+          window.addEventListener('devicemotion', handleDeviceMotion);
+        }
+      }
+    });
+
+    function handleDeviceMotion(e) {
+      if (sourceSelect.value === 'device' && e.accelerationIncludingGravity) {
+        accelX = (e.accelerationIncludingGravity.x || 0) / 9.8;
+        accelY = (e.accelerationIncludingGravity.y || 0) / 9.8;
+      }
+    }
+
+    // Main animation loop
+    let lastTime = performance.now();
+    const STIFFNESS = 24.0;
+    const DAMPING = 6.5;
+    const FORCE_SCALE = 240.0;
+
+    function render(now) {
+      requestAnimationFrame(render);
+      const dt = Math.min(0.05, (now - lastTime) / 1000.0);
+      lastTime = now;
+
+      // Compute kinematic forces
+      let state = 'Active';
+      if (sourceSelect.value !== 'device') {
+        const sim = computeVehicleForces(sourceSelect.value, now / 1000.0);
+        accelX = sim.x;
+        accelY = sim.y;
+        state = sim.state;
+      }
+
+      const effectiveAx = (accelX + manualOffset.x) * sensitivity;
+      const effectiveAy = (accelY + manualOffset.y) * sensitivity;
+      rollAngle = Math.atan2(-effectiveAx, 1.0);
+
+      // Update telemetry UI
+      telemetryX.textContent = (effectiveAx >= 0 ? '+' : '') + effectiveAx.toFixed(2) + 'g';
+      telemetryY.textContent = (effectiveAy >= 0 ? '+' : '') + effectiveAy.toFixed(2) + 'g';
+      telemetryRoll.textContent = (rollAngle * 180 / Math.PI).toFixed(1) + '°';
+      telemetryState.textContent = state;
+      statusText.textContent = state;
+
+      // Spring-mass-damper physics
+      const extForceX = -effectiveAx * FORCE_SCALE;
+      const extForceY = effectiveAy * FORCE_SCALE;
+      const sinRoll = Math.sin(rollAngle);
+      const centerX = width / 2;
+
+      for (let p of particles) {
+        let targetAnchorY = p.anchorY;
+        if (p.edge === 'top' || p.edge === 'bottom') {
+          targetAnchorY += (p.anchorX - centerX) * sinRoll * 0.4;
+        }
+
+        const dx = p.x - p.anchorX;
+        const dy = p.y - targetAnchorY;
+
+        const fx = extForceX - STIFFNESS * dx - DAMPING * p.vx;
+        const fy = extForceY - STIFFNESS * dy - DAMPING * p.vy;
+
+        p.vx += fx * dt;
+        p.vy += fy * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+      }
+
+      // Draw Canvas
+      ctx.clearRect(0, 0, width, height);
+      const dotRadius = 7.0;
+
+      for (let p of particles) {
+        // Outer glow
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, dotRadius * 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = currentTheme.glow;
+        ctx.fill();
+
+        // Core dot
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, dotRadius, 0, Math.PI * 2);
+        ctx.fillStyle = currentTheme.primary;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 2;
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
+      }
+    }
+
+    resize();
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
